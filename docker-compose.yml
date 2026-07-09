@@ -1,0 +1,8 @@
+services:
+  cowork:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - JWT_SECRET=hackathon-local-secret
+      - DATABASE_URL=sqlite:///./cowork.db
