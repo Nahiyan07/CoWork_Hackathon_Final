@@ -1,233 +1,237 @@
-# CoWork: Multi-Tenant Coworking Space Booking API
+# CoWork API — Multi-Tenant Coworking Space Booking System
 
-A FastAPI backend for managing coworking-space organizations, rooms, bookings, cancellations, refunds, usage reports, room availability, and room statistics in a multi-tenant environment.
+[![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-REST%20API-green.svg)](https://fastapi.tiangolo.com/)
+[![OpenAPI](https://img.shields.io/badge/OpenAPI-3.1-brightgreen.svg)](https://swagger.io/specification/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-This repository is prepared for the **IUT 12th ICT Fest Bdapps Agentic AI Hackathon Preliminary Round**. The challenge is a bug-fix task: the original backend contained hidden bugs, and the goal was to fix them while preserving the existing API contract exactly.
+**CoWork API** is a clean, fixed, and GitHub-ready FastAPI project for managing coworking-space room bookings in a multi-tenant environment. It supports organization registration, JWT authentication, room management, availability checking, booking operations, cancellation, admin reporting, and data export.
 
-## Hackathon Context
+This project was prepared for the **IUT 12th ICT Fest Bdapps Agentic AI Hackathon — Preliminary Round** bug-fix challenge.
 
-CoWork is evaluated by a black-box grader that interacts with the application only through the public HTTP API. Because of that, the implementation preserves:
+---
 
-- Endpoint paths
-- Request schemas
-- Response JSON field names
-- Status codes
-- Required error codes
-- Existing API behavior outside the required fixes
+## Table of Contents
 
-The project focuses on correctness, concurrency safety, multi-tenancy isolation, authentication behavior, and contract-compatible responses.
+- [Project Overview](#project-overview)
+- [Key Features](#key-features)
+- [Tech Stack](#tech-stack)
+- [API Endpoints](#api-endpoints)
+- [Input/Output Screenshots](#inputoutput-screenshots)
+- [Getting Started](#getting-started)
+- [Run with Docker](#run-with-docker)
+- [Swagger Testing Workflow](#swagger-testing-workflow)
+- [Example Request Bodies](#example-request-bodies)
+- [Project Structure](#project-structure)
+- [Hackathon Metadata](#hackathon-metadata)
+- [License](#license)
 
-## Tech Stack
+---
 
-- Python 3.11
-- FastAPI
-- SQLAlchemy
-- SQLite
-- JWT authentication with HS256
-- Pytest
-- Docker support
+## Project Overview
+
+Coworking spaces usually serve multiple organizations, teams, and users at the same time. A reliable booking API must prevent time conflicts, separate tenant data, calculate usage, and provide clear administrative reports.
+
+This API solves that problem by providing a backend service where each organization can:
+
+- register an admin account,
+- authenticate securely with JWT tokens,
+- create and manage rooms,
+- check room availability for a specific date,
+- create and cancel bookings,
+- view booking details,
+- generate room usage and revenue reports,
+- export operational booking data.
+
+---
 
 ## Key Features
 
-- Multi-tenant organization support
-- Admin and member roles
-- Room management by organization admins
-- Booking creation with validation, pricing, quota checks, and conflict prevention
-- Booking cancellation with refund calculation
-- JWT access and refresh authentication
-- Single-use refresh tokens
-- Logout token invalidation
-- Usage report for organization admins
-- Room availability lookup
-- Room booking statistics
-- CSV export for bookings
-- Pagination for booking lists
-- Contract-compatible application error responses
+- **Multi-tenant organization support** — data is separated by organization.
+- **JWT-based authentication** — login returns access and refresh tokens.
+- **Room management** — create and list rooms with capacity and hourly rate.
+- **Availability checking** — view available slots for a room on a given date.
+- **Booking system** — create, list, view, and cancel bookings.
+- **Conflict-safe booking flow** — designed to prevent overlapping bookings.
+- **Admin reporting** — view occupancy, bookings, and revenue per room.
+- **CSV export endpoint** — export booking and revenue data.
+- **Interactive Swagger UI** — test every endpoint from the browser.
+- **Docker support** — run the project with Docker Compose.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Backend Framework | FastAPI |
+| API Documentation | Swagger UI / OpenAPI 3.1 |
+| ORM | SQLAlchemy |
+| Validation | Pydantic |
+| Authentication | JWT Bearer Token |
+| Server | Uvicorn |
+| Containerization | Docker / Docker Compose |
+
+---
 
 ## API Endpoints
 
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| `GET` | `/health` | No | Service health check |
-| `POST` | `/auth/register` | No | Register a user and organization membership |
-| `POST` | `/auth/login` | No | Login and receive access/refresh tokens |
-| `POST` | `/auth/refresh` | No | Rotate refresh token and receive new tokens |
-| `POST` | `/auth/logout` | Yes | Invalidate the presented access token |
-| `GET` | `/rooms` | Yes | List rooms in the caller's organization |
-| `POST` | `/rooms` | Admin | Create a room |
-| `GET` | `/rooms/{id}/availability` | Yes | Get busy intervals for a room on a UTC date |
-| `GET` | `/rooms/{id}/stats` | Yes | Get current confirmed-booking count and revenue for a room |
-| `POST` | `/bookings` | Yes | Create a booking |
-| `GET` | `/bookings` | Yes | List visible bookings with pagination |
-| `GET` | `/bookings/{id}` | Yes | Get a single visible booking including refunds |
-| `POST` | `/bookings/{id}/cancel` | Yes | Cancel a booking and calculate refund |
-| `GET` | `/admin/usage-report` | Admin | Get per-room usage and revenue for a date/time range |
-| `GET` | `/admin/export` | Admin | Export bookings as CSV |
+### Health
 
-## Business Rules Summary
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/health` | Check API health status |
 
-### Datetime Handling
+### Authentication
 
-- All API datetimes are ISO 8601.
-- Inputs with a UTC offset are converted to UTC before storage/comparison.
-- Naive datetimes are treated as UTC.
-- Response datetimes are returned in UTC with an explicit `Z` designator.
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/auth/register` | Register a new organization and admin user |
+| `POST` | `/auth/login` | Login with organization name, username, and password |
+| `POST` | `/auth/refresh` | Refresh access token |
+| `POST` | `/auth/logout` | Revoke refresh token / logout |
 
-### Booking Duration and Pricing
+### Rooms
 
-- End time must be strictly after start time.
-- Start time must be strictly in the future at request time.
-- Duration must be a whole number of hours.
-- Minimum duration is 1 hour.
-- Maximum duration is 8 hours.
-- Price is calculated as:
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/rooms` | List rooms with optional filters |
+| `POST` | `/rooms` | Create a new room |
+| `GET` | `/rooms/{id}/availability` | Get room availability for a date range / date |
+| `GET` | `/rooms/{id}/stats` | Get room statistics such as bookings, usage, and revenue |
 
-```text
-price_cents = hourly_rate_cents × duration_hours
-```
+### Bookings
 
-Invalid booking windows return `400 INVALID_BOOKING_WINDOW`.
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/bookings` | Create a new booking |
+| `GET` | `/bookings` | List bookings with optional filters |
+| `GET` | `/bookings/{id}` | Get booking details |
+| `POST` | `/bookings/{id}/cancel` | Cancel a booking |
 
-### Double-Booking Prevention
+### Admin
 
-Two confirmed bookings overlap when:
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/admin/usage-report` | Get usage report with occupancy, revenue, and booking count |
+| `GET` | `/admin/export` | Export booking, user, and revenue data as CSV/text |
 
-```text
-existing.start < new.end AND new.start < existing.end
-```
+---
 
-Back-to-back bookings are allowed. Conflicts return `409 ROOM_CONFLICT`.
+## Input/Output Screenshots
 
-### Booking Quota
+The following screenshots show the API running successfully in Swagger UI at `http://127.0.0.1:8000/docs`.
 
-A member may hold at most 3 confirmed bookings with start time in:
+### 1. Health Check and Registration
 
-```text
-(now, now + 24h]
-```
+The API health endpoint returns a successful response, and the registration endpoint creates a new organization with an admin user.
 
-The quota is counted across all rooms in the user's organization. Violations return `409 QUOTA_EXCEEDED`.
+<img src="docs/screenshots/register.png" alt="CoWork API registration output in Swagger UI" width="900">
 
-### Rate Limiting
+---
 
-`POST /bookings` is limited to 20 requests per rolling 60 seconds per user. All attempts count, including failed requests. Excess requests return `429 RATE_LIMITED`.
+### 2. Login and JWT Authorization
 
-### Refund Policy
+The login endpoint returns an access token, refresh token, and token type. The access token is used in the Swagger **Authorize** modal as a Bearer token.
 
-Refund amount is based on cancellation notice:
+> Security note: never commit real production tokens or passwords. The screenshot uses local testing data only.
 
-| Notice Before Start | Refund |
-|---|---:|
-| `>= 48 hours` | 100% |
-| `>= 24 hours` and `< 48 hours` | 50% |
-| `< 24 hours` | 0% |
+<img src="docs/screenshots/login-auth.png" alt="CoWork API login and Swagger authorization output" width="900">
 
-Cancelling an already cancelled booking returns `409 ALREADY_CANCELLED`. Each cancelled booking has exactly one refund log.
+---
 
-### Multi-Tenancy Isolation
+### 3. Room Listing and Room Creation
 
-- Users can only access data from their own organization.
-- Cross-organization room IDs behave as not found: `404 ROOM_NOT_FOUND`.
-- Cross-organization booking IDs behave as not found: `404 BOOKING_NOT_FOUND`.
-- Members can only read and cancel their own bookings.
-- Admins can read and cancel bookings in their own organization.
+The room endpoints return room details such as room ID, organization ID, room name, capacity, and hourly rate.
 
-### Pagination and Ordering
+<img src="docs/screenshots/rooms.png" alt="CoWork API room listing and room creation output" width="900">
 
-`GET /bookings` supports:
+---
 
-- `page`, default `1`
-- `limit`, default `10`, maximum `100`
+### 4. Room Availability and Room Statistics
 
-Bookings are sorted by ascending start time, then ascending ID. The response includes `total`.
+The availability endpoint shows free time slots for a selected room and date. The stats endpoint shows confirmed bookings and total revenue.
 
-## Error Response Format
+<img src="docs/screenshots/room-availability-stats.png" alt="CoWork API room availability and room statistics output" width="900">
 
-Application errors follow this shape:
+---
 
-```json
-{
-  "detail": "Error message",
-  "code": "ERROR_CODE"
-}
-```
+### 5. Booking Creation and Booking List
 
-Required application error codes include:
+The booking endpoint creates a confirmed booking with start time, end time, status, price, and reference code. The list endpoint returns paginated booking data.
 
-| Code | Status |
-|---|---:|
-| `USERNAME_TAKEN` | 409 |
-| `INVALID_CREDENTIALS` | 401 |
-| `ROOM_CONFLICT` | 409 |
-| `QUOTA_EXCEEDED` | 409 |
-| `RATE_LIMITED` | 429 |
-| `ALREADY_CANCELLED` | 409 |
-| `BOOKING_NOT_FOUND` | 404 |
-| `ROOM_NOT_FOUND` | 404 |
-| `FORBIDDEN` | 403 |
-| `INVALID_BOOKING_WINDOW` | 400 |
+<img src="docs/screenshots/bookings.png" alt="CoWork API booking creation and booking list output" width="900">
 
-Missing, invalid, expired, or blacklisted tokens return `401`.
+---
 
-## Installation
+### 6. Admin Usage Report and Export
+
+The admin report endpoint returns room-level usage, confirmed booking count, occupancy percentage, and revenue. The export endpoint returns booking data in a CSV-like format.
+
+<img src="docs/screenshots/admin-report-export.png" alt="CoWork API admin usage report and export output" width="900">
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Python **3.12+** recommended
+- `pip`
+- Git
+- Optional: Docker and Docker Compose
 
 ### 1. Clone the Repository
 
 ```bash
 git clone <your-repository-url>
-cd ICT_Fest_Hackathon_Preliminary
+cd <your-project-folder>
 ```
 
-### 2. Create a Virtual Environment
+### 2. Create and Activate a Virtual Environment
 
-Use Python 3.11.
+#### Windows PowerShell
 
 ```bash
 python -m venv .venv
+.venv\Scripts\activate
 ```
 
-Activate it:
+#### macOS / Linux
 
 ```bash
-# Windows PowerShell
-.\.venv\Scripts\Activate.ps1
-
-# macOS/Linux
+python3 -m venv .venv
 source .venv/bin/activate
 ```
 
 ### 3. Install Dependencies
 
 ```bash
-python -m pip install --upgrade pip
+python -m pip install --upgrade pip setuptools wheel
 python -m pip install -r requirements.txt
 ```
 
-### 4. Run the Application
+> If `pydantic-core` fails to build on Windows, install Visual Studio Build Tools with the C++ toolchain, or use Python 3.12.
+
+### 4. Run the API
 
 ```bash
-python -m uvicorn app.main:app --reload
+uvicorn app.main:app --reload
 ```
 
-The API will be available at:
-
-```text
-http://127.0.0.1:8000
-```
-
-Interactive API documentation:
+### 5. Open Swagger UI
 
 ```text
 http://127.0.0.1:8000/docs
 ```
 
-Health check:
+### 6. Health Check
 
-```text
-http://127.0.0.1:8000/health
+```bash
+curl http://127.0.0.1:8000/health
 ```
 
-Expected health response:
+Expected response:
 
 ```json
 {
@@ -235,106 +239,78 @@ Expected health response:
 }
 ```
 
-## Docker
+---
 
-If Docker is available, run:
+## Run with Docker
 
 ```bash
 docker compose up --build
 ```
 
-The service will be exposed on:
+Then open:
 
 ```text
-http://127.0.0.1:8000
+http://127.0.0.1:8000/docs
 ```
 
-## Environment Variables
-
-| Variable | Default | Description |
-|---|---|---|
-| `DATABASE_URL` | `sqlite:///./cowork.db` | SQLAlchemy database URL |
-| `JWT_SECRET` | `change-me-for-local-dev-secret-32-bytes-minimum` | Secret used to sign JWT tokens |
-| `SQLITE_TIMEOUT_SECONDS` | `30` | SQLite busy timeout for concurrent access |
-
-For production-like environments, set a strong `JWT_SECRET`.
-
-Example:
+To stop the containers:
 
 ```bash
-export JWT_SECRET="replace-with-a-strong-secret"
+docker compose down
 ```
 
-Windows PowerShell:
+---
 
-```powershell
-$env:JWT_SECRET="replace-with-a-strong-secret"
+## Swagger Testing Workflow
+
+Use the following order while testing the API in Swagger UI:
+
+1. Run `GET /health` to confirm the API is running.
+2. Run `POST /auth/register` to create an organization and admin user.
+3. Run `POST /auth/login` to receive an access token.
+4. Click **Authorize** and paste the token in this format:
+
+```text
+Bearer <access_token>
 ```
 
-## Example API Usage
+5. Run `POST /rooms` to create a room.
+6. Run `GET /rooms` to confirm the room exists.
+7. Run `GET /rooms/{id}/availability` to check available slots.
+8. Run `POST /bookings` to create a booking.
+9. Run `GET /bookings` or `GET /bookings/{id}` to verify booking details.
+10. Run `POST /bookings/{id}/cancel` to cancel a booking if needed.
+11. Run `GET /admin/usage-report` to view occupancy and revenue.
+12. Run `GET /admin/export` to export booking data.
 
-### Register
+---
 
-The first user in a new organization becomes an admin.
+## Example Request Bodies
 
-```bash
-curl -X POST "http://127.0.0.1:8000/auth/register" \
-  -H "Content-Type: application/json" \
-  -d '{"org_name":"acme","username":"alice","password":"pass123"}'
-```
-
-Example response:
+### Register Organization
 
 ```json
 {
-  "id": 1,
-  "org_id": 1,
-  "username": "alice",
-  "role": "admin"
+  "org_name": "Acme Corp",
+  "username": "admin",
+  "password": "StrongP@ssw0rd!"
 }
 ```
 
 ### Login
 
-```bash
-curl -X POST "http://127.0.0.1:8000/auth/login" \
-  -H "Content-Type: application/json" \
-  -d '{"org_name":"acme","username":"alice","password":"pass123"}'
-```
-
-Example response:
-
 ```json
 {
-  "access_token": "<access-token>",
-  "refresh_token": "<refresh-token>",
-  "token_type": "bearer"
+  "org_name": "acme",
+  "username": "admin",
+  "password": "StrongP@ssw0rd!"
 }
-```
-
-### Use Bearer Token
-
-Protected endpoints require:
-
-```text
-Authorization: Bearer <access-token>
 ```
 
 ### Create Room
 
-```bash
-curl -X POST "http://127.0.0.1:8000/rooms" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <access-token>" \
-  -d '{"name":"Meeting Room A","capacity":8,"hourly_rate_cents":1000}'
-```
-
-Example response:
-
 ```json
 {
-  "id": 1,
-  "org_id": 1,
   "name": "Meeting Room A",
   "capacity": 8,
   "hourly_rate_cents": 1000
@@ -343,117 +319,58 @@ Example response:
 
 ### Create Booking
 
-Use a future UTC datetime.
-
-```bash
-curl -X POST "http://127.0.0.1:8000/bookings" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <access-token>" \
-  -d '{"room_id":1,"start_time":"2099-01-01T10:00:00Z","end_time":"2099-01-01T12:00:00Z"}'
-```
-
-Example response:
-
 ```json
 {
-  "id": 1,
-  "reference_code": "BK-7F8A2C9D",
   "room_id": 1,
-  "user_id": 1,
-  "start_time": "2099-01-01T10:00:00Z",
-  "end_time": "2099-01-01T12:00:00Z",
-  "status": "confirmed",
-  "price_cents": 2000,
-  "created_at": "2099-01-01T09:00:00Z"
+  "start_time": "2026-07-10T10:00:00Z",
+  "end_time": "2026-07-10T12:00:00Z"
 }
 ```
 
-## Testing
+### Usage Report Query Example
 
-Run the test suite:
-
-```bash
-python -m pytest -q
+```text
+GET /admin/usage-report?from=2026-07-10T00:00:00Z&to=2026-07-10T23:59:59Z
 ```
 
-The included tests cover major parts of the official API contract, including authentication, registration behavior, booking validation, room conflicts, quota, rate limiting, visibility, refunds, reports, availability, stats, and pagination.
-
-## Bug Fixing Summary
-
-This submission fixes contract-breaking bugs according to the hackathon business rules while keeping the API stable. The fixes focus on:
-
-- Correct UTC datetime parsing, storage, comparison, and serialization
-- Booking window validation and price calculation
-- Conflict detection and back-to-back booking behavior
-- Booking quota enforcement
-- Rolling rate limiting
-- Refund calculation and duplicate cancellation prevention
-- JWT claim correctness, expiry durations, logout invalidation, and refresh rotation
-- Multi-tenant access isolation
-- Member/admin booking visibility
-- Live usage reports, availability, and room stats without stale cache behavior
-- Pagination ordering and total count correctness
-- SQLite-safe handling for concurrency-sensitive paths
-
-No hidden grader score is claimed. The project is prepared to match the documented API contract.
+---
 
 ## Project Structure
 
 ```text
-app/
-├── main.py                 # FastAPI application entrypoint
-├── config.py               # Environment and configuration values
-├── database.py             # SQLAlchemy engine/session setup
-├── models.py               # Database models
-├── schemas.py              # Request schemas
-├── serializers.py          # Response serialization helpers
-├── auth.py                 # JWT, password hashing, auth dependencies
-├── errors.py               # Application error handling
-├── timeutils.py            # UTC datetime parsing/formatting helpers
-├── cache.py                # Cache module kept for compatibility
-├── locks.py                # Process-level critical-section locks
-├── routers/
-│   ├── auth.py             # Auth endpoints
-│   ├── rooms.py            # Room endpoints
-│   ├── bookings.py         # Booking endpoints
-│   ├── admin.py            # Admin report/export endpoints
-│   └── health.py           # Health endpoint
-└── services/
-    ├── ratelimit.py        # Booking rate limiter
-    ├── refunds.py          # Refund calculation
-    ├── reference.py        # Booking reference generation
-    ├── stats.py            # Statistics helpers
-    ├── export.py           # CSV export helper
-    └── notifications.py    # Notification stub
-
-tests/
-└── test_contract.py        # Contract-focused pytest tests
-
-requirements.txt
-Dockerfile
-docker-compose.yml
-bug_report.md
-README.md
+.
+├── app/
+│   ├── main.py              # FastAPI application entry point
+│   ├── database.py          # Database engine, session, and base configuration
+│   ├── models.py            # SQLAlchemy models
+│   ├── schemas.py           # Pydantic request/response schemas
+│   ├── auth.py              # Password hashing, JWT creation, and auth dependencies
+│   └── ...
+├── docs/
+│   └── screenshots/         # Swagger input/output screenshots used in README
+├── requirements.txt         # Python dependencies
+├── docker-compose.yml       # Docker Compose configuration
+├── Dockerfile               # Docker image definition
+└── README.md                # Project documentation
 ```
 
-## Submission Notes
-
-- API contract was preserved.
-- Endpoint paths were not changed.
-- Response field names were not changed.
-- Required application error format was preserved.
-- `bug_report.md` is included for manual review and tie-breaking support.
-- Local database files, virtual environments, cache folders, and temporary files should not be included in the final submission zip.
-
-## License
-
-For hackathon submission purposes only.
+> The exact file list may vary slightly depending on your final submission folder.
 
 ---
 
-## Hackathon Project Metadata
+## Hackathon Metadata
 
-**Team Name:** Ek_Bar_Dhokha_Kha_Chuka_Hun_Dobara_Nahi_Khaunga  
-**Team Lead:** Munshi Nahiyan Amin  
-**Institution:** University of Liberal Arts Bangladesh (ULAB)  
-**Registration Code:** 02-50670
+| Field | Information |
+|---|---|
+| Event | IUT 12th ICT Fest Bdapps Agentic AI Hackathon — Preliminary Round |
+| Project | CoWork API — Multi-Tenant Coworking Space Booking API |
+| Team Name | Ek_Bar_Dhokha_Kha_Chuka_Hun_Dobara_Nahi_Khaunga |
+| Team Lead | Munshi Nahiyan Amin |
+| Institution | University of Liberal Arts Bangladesh (ULAB) |
+| Registration Code | 02-50670 |
+
+---
+
+## License
+
+This project is licensed under the **MIT License**.
