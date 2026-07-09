@@ -371,6 +371,3 @@ GET /admin/usage-report?from=2026-07-10T00:00:00Z&to=2026-07-10T23:59:59Z
 
 ---
 
-## License
-
-This project is licensed under the **MIT License**.
